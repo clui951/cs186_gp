@@ -21,12 +21,14 @@ public class Filter extends Operator {
      *            The child operator
      */
     public Filter(Predicate p, DbIterator child) {
-        // IMPLEMENT ME
+        // IMPLEMENTED
+        this.pred = p;
+        this.child = child;
     }
 
     public Predicate getPredicate() {
-        // IMPLEMENT ME
-        return null;
+        // IMPLEMENTED
+        return this.pred;
     }
 
     /**
