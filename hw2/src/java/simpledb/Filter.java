@@ -10,6 +10,10 @@ public class Filter extends Operator {
     private static final long serialVersionUID = 1L;
     private Predicate pred;
     private DbIterator child;
+    private ArrayList<Tuple> childTups = new ArrayList<Tuple>();
+    private TupleDesc td;
+    private Iterator<Tuple> it;
+
 
     /**
      * Constructor accepts a predicate to apply and a child operator to read
@@ -24,6 +28,7 @@ public class Filter extends Operator {
         // IMPLEMENTED
         this.pred = p;
         this.child = child;
+        td = child.getTupleDesc();
     }
 
     public Predicate getPredicate() {
@@ -35,21 +40,30 @@ public class Filter extends Operator {
      * Returns the schema of the operator.
      */
     public TupleDesc getTupleDesc() {
-        // IMPLEMENT ME
-        return null;
+        // IMPLEMENTED
+        return this.td;
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // IMPLEMENT ME
+        // IMPLEMENTED
+        this.child.open();
+        while (child.hasNext()) {
+            childTups.add((Tuple) child.next());
+        }
+        it = childTups.iterator();
+        super.open();
     }
 
     public void close() {
-        // IMPLEMENT ME
+        // IMPLEMENTED
+        super.close();
+        it = null;
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // IMPLEMENT ME
+        // IMPLEMENTED
+        it = childTups.iterator();
     }
 
     /**
@@ -63,7 +77,13 @@ public class Filter extends Operator {
      */
     protected Tuple fetchNext() throws NoSuchElementException,
             TransactionAbortedException, DbException {
-        // IMPLEMENT ME
+        // IMPLEMENTED
+        while (it != null && it.hasNext()) {
+            Tuple itNext = it.next();
+            if (this.pred.filter(itNext) == true) {
+                return itNext;
+            } 
+        }
         return null;
     }
 
