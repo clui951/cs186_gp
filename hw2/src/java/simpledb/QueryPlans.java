@@ -7,14 +7,20 @@ public class QueryPlans {
 
 	//SELECT * FROM T1, T2 WHERE T1.column0 = T2.column0;
 	public Operator queryOne(DbIterator t1, DbIterator t2) {
-		// IMPLEMENT ME
-		return null;
+		// IMPLEMENTED
+		JoinPredicate joinPred = new JoinPredicate(0, Predicate.Op.EQUALS, 0);
+		Join joinInstance = new Join(joinPred, t1, t2);
+		return joinInstance;
 	}
 
 	//SELECT * FROM T1, T2 WHERE T1. column0 > 1 AND T1.column1 = T2.column1;
 	public Operator queryTwo(DbIterator t1, DbIterator t2) {
 		// IMPLEMENT ME
-		return null;
+		new Filter(new Predicate(0, Predicate.Op.GREATER_THAN, new IntField(1)), t1);
+
+		JoinPredicate joinPred = new JoinPredicate(1, Predicate.Op.EQUALS, 1);
+		Join joinInstance = new Join(joinPred, t1, t2);
+		return joinInstance;
 	}
 
 	//SELECT column0, MAX(column1) FROM T1 WHERE column2 > 1 GROUP BY column0;
