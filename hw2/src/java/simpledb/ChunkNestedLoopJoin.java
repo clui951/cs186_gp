@@ -12,6 +12,9 @@ public class ChunkNestedLoopJoin extends Operator {
     private DbIterator child1, child2;
     private TupleDesc comboTD;
     private int chunkSize;
+    private Chunk child1Chunk;
+    private Iterator<Tuple> child1ChunkTuples;
+    private Tuple currentChild1Tuple;
 
     /**
      * Constructor. Accepts to children to join and the predicate to join them
@@ -32,6 +35,7 @@ public class ChunkNestedLoopJoin extends Operator {
         this.child2 = child2;
         this.chunkSize = chunkSize;
         comboTD = TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
+        this.child1Chunk = new Chunk(this.chunkSize);
     }
 
     public JoinPredicate getJoinPredicate() {
@@ -47,14 +51,18 @@ public class ChunkNestedLoopJoin extends Operator {
      */
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // IMPLEMENT ME
+        this.child1.open();
+        this.child2.open();
+        super.open();
     }
 
     /**
      * Closes the iterator.
      */
     public void close() {
-        // IMPLEMENT ME
+        this.child1.close();
+        this.child2.close();
+        super.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
@@ -67,15 +75,16 @@ public class ChunkNestedLoopJoin extends Operator {
      */
     public Chunk getCurrentChunk() throws DbException, TransactionAbortedException {
         // IMPLEMENT ME
-        return null;
+        return this.child1Chunk;
     }
  
     /**
      * Updates the current chunk with the next set of Tuples and returns the chunk.
      */
     protected Chunk fetchNextChunk() throws DbException, TransactionAbortedException {
-        // IMPLEMENT ME
-        return null;
+        this.child1Chunk.loadChunk(child1);
+        this.child1ChunkTuples = Arrays.asList(this.child1Chunk.getChunkTuples()).iterator();
+        return this.child1Chunk;
     }
 
     /**
@@ -95,8 +104,45 @@ public class ChunkNestedLoopJoin extends Operator {
      * @see JoinPredicate#filter
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // IMPLEMENT ME
-        return null;
+        if (this.child1ChunkTuples == null) {  // Set up for first run
+            this.fetchNextChunk();
+            this.currentChild1Tuple = this.child1ChunkTuples.next();
+        }
+        while (this.child1ChunkTuples.hasNext() || child1.hasNext()) {
+            // At this point we either have a valid tuple or we can still load another page
+            // if (!this.child1ChunkTuples.hasNext()) {
+            //     this.fetchNextChunk();
+            // }
+            if (!this.child2.hasNext()) {
+                this.child2.rewind();
+                if (!this.child1ChunkTuples.hasNext()) {
+                    this.fetchNextChunk();
+                }
+                this.currentChild1Tuple = this.child1ChunkTuples.next(); 
+                if (this.currentChild1Tuple == null) {  // Filler null-tuples of the last page if it's not a clean split
+                    return null; 
+            }
+
+            }
+            Tuple child1Tup = this.currentChild1Tuple;
+            Tuple child2Tup = this.child2.next();
+
+            if (this.pred.filter(child1Tup, child2Tup)) {  // Check if condition is satisfied
+                Tuple t1 = child1Tup;
+                Tuple t2 = child2Tup;
+                int td1n = t1.getTupleDesc().numFields();
+                int td2n = t2.getTupleDesc().numFields();
+
+                // set fields in combined tuple
+                Tuple t = new Tuple(comboTD);  // Creating combined tuple
+                for (int i = 0; i < td1n; i++)
+                    t.setField(i, t1.getField(i));
+                for (int i = 0; i < td2n; i++)
+                    t.setField(td1n + i, t2.getField(i));
+                return t;
+            }
+        }
+        return null;   
     }
 
     @Override
