@@ -1,6 +1,8 @@
 package simpledb;
 
 import java.util.*;
+import java.util.LinkedList;
+import java.util.Queue;
 
 /**
  * The SymmetricHashJoin operator implements the symmetric hash join operation.
@@ -10,8 +12,16 @@ public class SymmetricHashJoin extends Operator {
     private DbIterator child1, child2;
     private TupleDesc comboTD;
 
+    private int switched = 0;
+
     private HashMap<Object, ArrayList<Tuple>> leftMap = new HashMap<Object, ArrayList<Tuple>>();
     private HashMap<Object, ArrayList<Tuple>> rightMap = new HashMap<Object, ArrayList<Tuple>>();
+
+    private int fieldLeft;
+    private int fieldRight;
+    private boolean dontSwitch;
+
+    private Queue outputStuff;
 
      /**
      * Constructor. Accepts children to join and the predicate to join them on.
@@ -28,6 +38,10 @@ public class SymmetricHashJoin extends Operator {
         this.child1 = child1;
         this.child2 = child2;
         comboTD = TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
+        this.fieldLeft = this.pred.getField1();
+        this.fieldRight = this.pred.getField2();   
+        this.dontSwitch = false;   
+        this.outputStuff = new LinkedList();  
     }
 
     public TupleDesc getTupleDesc() {
@@ -39,14 +53,20 @@ public class SymmetricHashJoin extends Operator {
      */
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // IMPLEMENT ME
+        // IMPLEMENTED
+        this.child1.open();
+        this.child2.open();
+        super.open();
     }
 
     /**
      * Closes the iterator.
      */
     public void close() {
-        // IMPLEMENT ME
+        // IMPLEMENTED
+        this.child1.close();
+        this.child2.close();
+        super.close();
     }
 
     /**
@@ -74,6 +94,65 @@ public class SymmetricHashJoin extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // IMPLEMENT ME
+        Tuple out = null;
+        if (outputStuff.peek() != null) {
+            out = (Tuple) outputStuff.remove();
+        }
+
+        // handle different lengthed 
+
+
+        if (out != null) {
+            return out;
+        } else {
+
+            while (child1.hasNext() || child2.hasNext()){
+                if (!child1.hasNext() && !child2.hasNext()) {
+                    return null;
+                }
+                if (!child1.hasNext() || !child2.hasNext()) {
+                    dontSwitch = true;
+                    if (!child1.hasNext()) {
+                        switched = 1;
+                    } else {
+                        switched = 0;
+                    }
+                }
+
+                if (switched == 0) {
+                    // System.out.println("\nSWITCHED VALUE: " + switched);
+                    // hash child1 into left and find matches in right
+                    Tuple child1Tup = child1.next();
+                    this.insertTuple(child1Tup);
+                    ArrayList<Tuple> possibleMatches = this.lookupTuple(child1Tup);
+                    if (possibleMatches != null) {
+                        // System.out.println("HIT, should not switch");
+                        for (Tuple tupp : possibleMatches) {
+                            Tuple newOutput = this.combineTuples(child1Tup, tupp);
+                            outputStuff.add(newOutput);
+                        }
+                        return (Tuple) outputStuff.remove();
+                    }
+                } else {
+                    // System.out.println("\nSWITCHED: " + switched);
+                    // hash child0 into right and find matches in left
+                    Tuple child2Tup = child2.next();
+                    this.insertTuple(child2Tup);
+                    ArrayList<Tuple> possibleMatches = this.lookupTuple(child2Tup);
+                    if (possibleMatches != null) {
+                        // System.out.println("HIT, should not switch");
+                        for (Tuple tupp : possibleMatches) {
+                            Tuple newOutput = this.combineTuples(tupp, child2Tup);                            
+                            outputStuff.add(newOutput);
+                        }
+                        return (Tuple) outputStuff.remove();
+                    }
+                }
+                if (!dontSwitch) {
+                    this.switchRelations();
+                }
+            }
+        }
         return null;
     }
 
@@ -82,6 +161,11 @@ public class SymmetricHashJoin extends Operator {
      */
     private void switchRelations() throws TransactionAbortedException, DbException {
         // IMPLEMENT ME
+        if (switched == 0) {
+            switched = 1;
+        } else {
+            switched = 0;
+        }
     }
 
     @Override
@@ -93,6 +177,61 @@ public class SymmetricHashJoin extends Operator {
     public void setChildren(DbIterator[] children) {
         this.child1 = children[0];
         this.child2 = children[1];
+    }
+
+
+
+
+    public Tuple combineTuples(Tuple child1Tup, Tuple child2Tup) {
+        Tuple t1 = child1Tup;
+        Tuple t2 = child2Tup;
+        int td1n = t1.getTupleDesc().numFields();
+        int td2n = t2.getTupleDesc().numFields();
+
+        // set fields in combined tuple
+        Tuple t = new Tuple(comboTD);  // Creating combined tuple
+        for (int i = 0; i < td1n; i++)
+            t.setField(i, t1.getField(i));
+        for (int i = 0; i < td2n; i++)
+            t.setField(td1n + i, t2.getField(i));
+        return t;
+    }
+
+    public void insertTuple(Tuple tup) {
+        // get the key from tup
+        Object key;
+        HashMap<Object, ArrayList<Tuple>> map;
+        if (switched == 0) {
+            key = tup.getField(this.fieldLeft);
+            map = leftMap;
+        } else {
+            key = tup.getField(this.fieldRight);   
+            map = rightMap;         
+        }
+        ArrayList<Tuple> tupArray = map.get(key);
+        if (tupArray == null) {
+            // first elem inserted
+            tupArray = new ArrayList<Tuple>();
+            tupArray.add(tup);
+            map.put(key, tupArray);
+        } else {
+            map.get(key).add(tup);
+        }
+    }
+
+    public ArrayList<Tuple> lookupTuple(Tuple tup) {
+        // get the key from tup
+        Object key;
+        HashMap<Object, ArrayList<Tuple>> map;
+        if (switched == 0) {
+            key = tup.getField(this.fieldLeft);
+            map = rightMap;
+        } else {
+            key = tup.getField(this.fieldRight);     
+            map = leftMap;
+        }
+        ArrayList<Tuple> tupArray = map.get(key);
+        return tupArray;
     }
 
 }
