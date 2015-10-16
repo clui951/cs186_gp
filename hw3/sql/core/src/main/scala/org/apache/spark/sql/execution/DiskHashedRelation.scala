@@ -67,10 +67,12 @@ private[sql] class DiskPartition (
    */
   def insert(row: Row) = {
     // TRIED IMPLEMENTING
-    this.data.add(row)
-    this.writtenToDisk = false
-    if (this.measurePartitionSize() > blockSize) {
-      this.spillPartitionToDisk()
+    if (!this.inputClosed) {
+      this.data.add(row)
+      this.writtenToDisk = false
+      if (this.measurePartitionSize() > blockSize) {
+        this.spillPartitionToDisk()
+      }
     }
   }
 
@@ -165,12 +167,13 @@ private[sql] class DiskPartition (
    */
   def closeInput() = {
     // IMPLEMENT ME
+    // this.closePartition()
+    inStream.close()
     if (!this.writtenToDisk) {
       this.spillPartitionToDisk()
     }
-    // this.closePartition()
-    outStream.close()
     this.inputClosed = true
+    outStream.close()
   }
 
 
