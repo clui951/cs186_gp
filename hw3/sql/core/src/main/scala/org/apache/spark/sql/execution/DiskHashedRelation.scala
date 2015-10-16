@@ -74,6 +74,8 @@ private[sql] class DiskPartition (
         this.spillPartitionToDisk()
         data.clear()
       }
+    } else {
+      throw new SparkException("SORRY, CANNOT INSERT NEW")
     }
   }
 
@@ -169,12 +171,13 @@ private[sql] class DiskPartition (
   def closeInput() = {
     // IMPLEMENT ME
     // this.closePartition()
-    inStream.close()
+    // inStream.close()
     if (!this.writtenToDisk) {
       this.spillPartitionToDisk()
+      data.clear()
     }
     this.inputClosed = true
-    outStream.close()
+    // outStream.close()
   }
 
 

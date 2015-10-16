@@ -22,15 +22,18 @@ class DiskPartitionSuite extends FunSuite {
 
   test ("close input") {
     val partition: DiskPartition = new DiskPartition("close input test", 1)
-
+    printf("STAGE 1")
     intercept[SparkException] {
       partition.getData()
     }
+    printf("STAGE 2")
 
     partition.closeInput()
+    printf("STAGE 3")
 
     intercept[SparkException] {
       partition.insert(Row(1))
     }
+    printf("STAGE 4")
   }
 }
