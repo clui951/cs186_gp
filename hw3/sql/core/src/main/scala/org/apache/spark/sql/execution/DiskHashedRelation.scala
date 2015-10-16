@@ -72,6 +72,7 @@ private[sql] class DiskPartition (
       this.writtenToDisk = false
       if (this.measurePartitionSize() > blockSize) {
         this.spillPartitionToDisk()
+        data.clear()
       }
     }
   }
