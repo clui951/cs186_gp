@@ -37,11 +37,13 @@ protected [sql] final class GeneralDiskHashedRelation(partitions: Array[DiskPart
 
   override def getIterator() = {
     // IMPLEMENT ME
+    // new Iterator[partitions]
     null
   }
 
   override def closeAllPartitions() = {
     // IMPLEMENT ME
+
   }
 }
 
@@ -64,6 +66,10 @@ private[sql] class DiskPartition (
    */
   def insert(row: Row) = {
     // IMPLEMENT ME
+    if (measurePartitionSize() + 1 > blockSize) {
+      spillPartitionToDisk()
+    }
+    data.add(row)
   }
 
   /**
