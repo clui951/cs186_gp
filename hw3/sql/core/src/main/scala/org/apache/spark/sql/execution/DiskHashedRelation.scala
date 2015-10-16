@@ -37,14 +37,15 @@ protected [sql] final class GeneralDiskHashedRelation(partitions: Array[DiskPart
 
   override def getIterator() = {
     // IMPLEMENT ME
-    // new Iterator[partitions]
-    // partitions.iterator.asScala
-    null
+    partitions.iterator.asScala
+    //null
   }
 
   override def closeAllPartitions() = {
+    for (partt <- partitions) {
+      partt.closePartition()
+    }
     // IMPLEMENT ME
-
   }
 }
 
@@ -66,16 +67,16 @@ private[sql] class DiskPartition (
    * @param row the [[Row]] we are adding
    */
   def insert(row: Row) = {
-    // TRIED IMPLEMENTING
-    if (!this.inputClosed) {
-      this.data.add(row)
+    if (!this.inputClosed){
+      data.add(row)
       this.writtenToDisk = false
       if (this.measurePartitionSize() > blockSize) {
         this.spillPartitionToDisk()
         data.clear()
       }
-    } else {
-      throw new SparkException("SORRY, CANNOT INSERT NEW AFTER CLOSING INPUT")
+    }
+    else {
+      throw new SparkException("Should not be attempting inserts after closing the input.")
     }
   }
 
@@ -137,7 +138,8 @@ private[sql] class DiskPartition (
         // IMPLEMENT ME
         if (currentIterator.hasNext || chunkSizeIterator.hasNext) {
           true
-        } else {
+        }
+        else {
           false
         }
       }
@@ -170,14 +172,14 @@ private[sql] class DiskPartition (
    */
   def closeInput() = {
     // IMPLEMENT ME
-    // this.closePartition()
-    // inStream.close()
+    //inStream.close()
     if (!this.writtenToDisk) {
       this.spillPartitionToDisk()
       data.clear()
     }
+    //this.closePartition()
+    outStream.close()
     this.inputClosed = true
-    // outStream.close()
   }
 
 
@@ -214,6 +216,24 @@ private[sql] object DiskHashedRelation {
                 size: Int = 64,
                 blockSize: Int = 64000) = {
     // IMPLEMENT ME
-    null
+
+    // Initialize output array of "hash buckets"
+    val parts = new Array[DiskPartition](size)
+    var i = 0
+    for (i <- 0 until size) {
+      parts(i) = new DiskPartition("temp_file_partition.txt", blockSize)
+    }
+
+    // Hash stuff into output array of "hash buckets"
+    while (input.hasNext) {
+      var r = input.next()
+      parts(keyGenerator.apply(r).hashCode() % size).insert(r)
+    }
+
+    // Get ready to return and close partitions
+    var result = new GeneralDiskHashedRelation(parts)
+    result.closeAllPartitions()
+    result
+    //null
   }
 }
