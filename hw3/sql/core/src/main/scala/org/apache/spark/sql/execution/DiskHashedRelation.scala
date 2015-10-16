@@ -167,10 +167,9 @@ private[sql] class DiskPartition (
     if (!this.writtenToDisk) {
       this.spillPartitionToDisk()
     }
-    // this.closePartition()
-    inStream.close()
+    this.closePartition()
     outStream.close()
-    inputClosed = true
+    this.inputClosed = true
   }
 
 
