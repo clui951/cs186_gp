@@ -75,7 +75,7 @@ private[sql] class DiskPartition (
         data.clear()
       }
     } else {
-      throw new SparkException("SORRY, CANNOT INSERT NEW")
+      throw new SparkException("SORRY, CANNOT INSERT NEW AFTER CLOSING INPUT")
     }
   }
 
