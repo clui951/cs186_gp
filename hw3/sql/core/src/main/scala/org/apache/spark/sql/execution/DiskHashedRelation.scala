@@ -38,8 +38,8 @@ protected [sql] final class GeneralDiskHashedRelation(partitions: Array[DiskPart
   override def getIterator() = {
     // IMPLEMENT ME
     // new Iterator[partitions]
-    partitions.iterator.asScala
-    // null
+    // partitions.iterator.asScala
+    null
   }
 
   override def closeAllPartitions() = {
@@ -114,7 +114,7 @@ private[sql] class DiskPartition (
 
       override def next() = {
         // IMPLEMENT ME
-        if (!currentIterator.hasNext()) {
+        if (!currentIterator.hasNext) {
           if (this.fetchNextChunk()) {
             currentIterator.next()
           }
@@ -129,7 +129,7 @@ private[sql] class DiskPartition (
 
       override def hasNext() = {
         // IMPLEMENT ME
-        if (currentIterator.hasNext() || chunkSizeIterator.hasNext()) {
+        if (currentIterator.hasNext || chunkSizeIterator.hasNext) {
           true
         } else {
           false
@@ -144,9 +144,9 @@ private[sql] class DiskPartition (
        */
       private[this] def fetchNextChunk(): Boolean = {
         // IMPLEMENT ME
-        if (chunkSizeIterator.hasNext()) {
-          byteArray = getNextChunkBytes(inStream, chunkSizeIterator.next(), byteArray)
-          currentIterator = byteArray.iterator.asScala
+        if (chunkSizeIterator.hasNext) {
+          byteArray = CS186Utils.getNextChunkBytes(inStream, chunkSizeIterator.next(), byteArray)
+          currentIterator = CS186Utils.getListFromBytes(byteArray).iterator.asScala
           true
         } else {
           false
