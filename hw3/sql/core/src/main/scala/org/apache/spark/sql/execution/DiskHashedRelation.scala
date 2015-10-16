@@ -68,6 +68,7 @@ private[sql] class DiskPartition (
   def insert(row: Row) = {
     // TRIED IMPLEMENTING
     this.data.add(row)
+    this.writtenToDisk = false
     if (this.measurePartitionSize() > blockSize) {
       this.spillPartitionToDisk()
     }
@@ -167,7 +168,7 @@ private[sql] class DiskPartition (
     if (!this.writtenToDisk) {
       this.spillPartitionToDisk()
     }
-    this.closePartition()
+    // this.closePartition()
     outStream.close()
     this.inputClosed = true
   }
