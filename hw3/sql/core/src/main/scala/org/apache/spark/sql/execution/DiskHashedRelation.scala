@@ -37,7 +37,7 @@ protected [sql] final class GeneralDiskHashedRelation(partitions: Array[DiskPart
 
   override def getIterator() = {
     // IMPLEMENT ME
-    partitions.iterator.asScala
+    partitions.iterator
     //null
   }
 
