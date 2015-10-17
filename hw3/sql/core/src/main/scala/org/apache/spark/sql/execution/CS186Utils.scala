@@ -106,20 +106,36 @@ object CS186Utils {
    */
   def getUdfFromExpressions(expressions: Seq[Expression]): ScalaUdf = {
     // IMPLEMENT ME
-    var last_udf = new ScalaUdf((sid: Int) => sid + 1, IntegerType, expressions.head)
+    // var last_udf = new ScalaUdf((sid: Int) => sid + 1, Integer, expressions)
     var flag = 0
-    for (exp <- expressions) {
-      if (exp.getClass == ScalaUdf) {
-        last_udf = exp
+
+    var rev_iter = expressions.reverseIterator
+    var indexx = -1
+
+
+    while (rev_iter.hasNext) {
+      var exp = rev_iter.next()
+      if (matchTest(exp) == 1 && flag == 0) {
+        indexx = expressions.lastIndexOf(exp)
         flag = 1
       }
     }
+
     if (flag == 1) {
+      var last_udf:ScalaUdf = expressions.apply(indexx).asInstanceOf[ScalaUdf]
       last_udf
     } else {
       null
     }
+
   }
+
+  def matchTest(x: Expression): Int = { 
+    x match {
+      case y: ScalaUdf => 1
+      case _ => 0
+   }
+ }
 
   /**
    * This function takes a sequence of expressions. If there is no UDF in the sequence of expressions, it does
