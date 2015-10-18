@@ -189,6 +189,7 @@ private[sql] class DiskPartition (
   private[sql] def closePartition() = {
     inStream.close()
     Files.deleteIfExists(path)
+    this.inputClosed = true
   }
 }
 
