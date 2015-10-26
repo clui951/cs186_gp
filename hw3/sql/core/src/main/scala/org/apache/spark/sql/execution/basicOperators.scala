@@ -30,6 +30,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.{ClusteredDistribution, OrderedDistribution, SinglePartition, UnspecifiedDistribution}
 import org.apache.spark.util.MutablePair
 import org.apache.spark.util.collection.ExternalSorter
+import org.apache.spark.sql.execution.DiskHashedRelation._
 
 /**
  * :: DeveloperApi ::
@@ -101,14 +102,38 @@ case class PartitionProject(projectList: Seq[Expression], child: SparkPlan) exte
     // IMPLEMENT ME
 
     new Iterator[Row] {
+
+      // Hash input smartly
+      var hashedStuff = DiskHashedRelation.apply(input, keyGenerator)
+      var hashedPartitionIterator = hashedStuff.getIterator()
+      hashedStuff.closeAllPartitions()
+
+      // Make memoization thing
+      var cachingIteratorGeneratorFunction = CS186Utils.generateCachingIterator(projectList, child.output)
+
+      var result = cachingIteratorGeneratorFunction(hashedPartitionIterator.next().getData())
+      // Get some pointer to the data (returned by #2)
+      // Read in and do memoization things
+      // Store (or perhaps it's store) and get pointer
+      // Attache to next(), hasNext()
+
       def hasNext() = {
         // IMPLEMENT ME
-        false
+        if (result.hasNext || fetchNextPartition()) { // There exists a next or try to fetchNextPartition and it's true
+          true
+        }
+        else {
+          false
+        }
       }
 
       def next() = {
-        // IMPLEMENT ME
-        null
+        if (hasNext) {
+          result.next()
+        }
+        else {
+          null
+        }
       }
 
       /**
@@ -119,7 +144,15 @@ case class PartitionProject(projectList: Seq[Expression], child: SparkPlan) exte
        */
       private def fetchNextPartition(): Boolean  = {
         // IMPLEMENT ME
-        false
+        if (hashedPartitionIterator.hasNext) {
+          var nextDiskPartition = hashedPartitionIterator.next()  // Fetch the next disk partition
+          var nextDiskPartitionData = nextDiskPartition.getData() // Get an interator over the rows of that disk partition
+          result = cachingIteratorGeneratorFunction(nextDiskPartitionData)  // Use memoization thing to process
+          true
+        }
+        else {
+          false
+        }
       }
     }
   }

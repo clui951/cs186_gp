@@ -106,8 +106,36 @@ object CS186Utils {
    */
   def getUdfFromExpressions(expressions: Seq[Expression]): ScalaUdf = {
     // IMPLEMENT ME
-    null
+    // var last_udf = new ScalaUdf((sid: Int) => sid + 1, Integer, expressions)
+    var flag = 0
+
+    var rev_iter = expressions.reverseIterator
+    var indexx = -1
+
+
+    while (rev_iter.hasNext) {
+      var exp = rev_iter.next()
+      if (matchTest(exp) == 1 && flag == 0) {
+        indexx = expressions.lastIndexOf(exp)
+        flag = 1
+      }
+    }
+
+    if (flag == 1) {
+      var last_udf:ScalaUdf = expressions.apply(indexx).asInstanceOf[ScalaUdf]
+      last_udf
+    } else {
+      null
+    }
+
   }
+
+  def matchTest(x: Expression): Int = { 
+    x match {
+      case y: ScalaUdf => 1
+      case _ => 0
+   }
+ }
 
   /**
    * This function takes a sequence of expressions. If there is no UDF in the sequence of expressions, it does
@@ -189,12 +217,35 @@ object CachingIteratorGenerator {
 
         def hasNext() = {
           // IMPLEMENT ME
-          false
+          input.hasNext
+          // false
         }
 
         def next() = {
           // IMPLEMENT ME
-          null
+          if (input.hasNext){
+            var curr_input = input.next()
+            var key = cacheKeyProjection.apply(curr_input)
+            var first = preUdfProjection.apply(curr_input)
+            // var middle = new Row()
+            // var first_iter = first.iterator
+            var last = postUdfProjection.apply(curr_input)
+            // var last_iter = last.iterator
+            if (cache.containsKey(key)) {
+              var middle = cache.get(key)
+              Row.fromSeq(first++middle++last)
+              // var middle_iter = middle.iterator
+            } else {
+              var middle = udfProject.apply(curr_input)
+              // middle = udf(middle) // MAY OR MAY NOT NEED
+              cache.put(key,middle)
+              Row.fromSeq(first++middle++last)
+              // var middle_iter = middle.iterator
+            }
+            // append first middle last
+          } else {
+            null 
+          }
         }
       }
     }
