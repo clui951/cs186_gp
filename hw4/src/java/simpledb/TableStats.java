@@ -62,6 +62,10 @@ public class TableStats {
     private final int ioCostPerPage;
     private final TupleDesc tupleDesc;
     private int numPages, numTuples;
+    private ArrayList<IntStatistics> intStats;
+    private ArrayList<StringHistogram> stringHists;
+    private HashMap<Integer, Integer> intMap;
+    private HashMap<Integer, Integer> stringMap;
 
     // TODO: add any fields that you may need
 
@@ -90,8 +94,28 @@ public class TableStats {
         numTuples = 0;
 
         int numFields = tupleDesc.numFields();
+        intStats = new ArrayList<IntStatistics>();
+        stringHists = new ArrayList<StringHistogram>();
+        intMap = new HashMap<Integer, Integer>();
+        stringMap = new HashMap<Integer, Integer>();
 
-        // TODO: what goes here?
+        int intMapNum = 0;
+        int stringMapNum = 0;
+
+        for (int i = 0; i < numFields; i++) {
+            if (tupleDesc.getFieldType(i) == Type.INT_TYPE) {
+                IntStatistics intStat = new IntStatistics(100);
+                intStats.add(intStat);
+                intMap.put(i, intMapNum);
+                intMapNum++;
+            }
+            else { // Must be string in our case
+                StringHistogram stringHist = new StringHistogram(NUM_HIST_BINS);
+                stringHists.add(stringHist);
+                stringMap.put(i, stringMapNum);
+                stringMapNum++;
+            }
+        }
 
         final DbFileIterator iter = file.iterator(null);
         try {
@@ -101,7 +125,18 @@ public class TableStats {
                 Tuple t = iter.next();
                 numTuples++;
 
-                // TODO: and here?
+                int intFieldIndex = 0;
+                int stringFieldIndex = 0;
+                for (int i = 0; i < numFields; i++) {
+                    if (tupleDesc.getFieldType(i) == Type.INT_TYPE) {
+                        intStats.get(i).addValue(((IntField) t.getField(i)).getValue());
+                        intFieldIndex++;
+                    }
+                    else {
+                        stringHists.get(i).addValue(((StringField) t.getField(i)).getValue());
+                        stringFieldIndex++;                        
+                    }
+                }
             }
             iter.close();
         } catch (DbException e) {
@@ -125,7 +160,7 @@ public class TableStats {
      */
     public double estimateScanCost() {
         // TODO: some code goes here
-        return 0;
+        return numPages*ioCostPerPage;
     }
 
     /**
@@ -139,7 +174,7 @@ public class TableStats {
      */
     public int estimateTableCardinality(double selectivityFactor) {
         // TODO: some code goes here
-        return 0;
+        return (int) (selectivityFactor*numTuples);
     }
 
     /**
@@ -155,9 +190,16 @@ public class TableStats {
      * @return The estimated selectivity (fraction of tuples that satisfy) the
      *         predicate
      */
+
+
     public double estimateSelectivity(int field, Predicate.Op op, Field constant) {
         // TODO: some code goes here
-        return 0;
+        if (intMap.containsKey(field)) { // Integer value
+            return intStats.get(intMap.get(field)).estimateSelectivity(op, ((IntField) constant).getValue());
+        }
+        else { // String value
+            return stringHists.get(stringMap.get(field)).estimateSelectivity(op, ((StringField) constant).getValue());
+        }
     }
 
     /**

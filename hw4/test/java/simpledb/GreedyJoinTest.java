@@ -105,6 +105,7 @@ public class GreedyJoinTest {
         // we're just doing a heuristics-based optimizer, so, only ignore the
         // really
         // bad case where "hobbies" is the outermost node in the left-deep tree.
+        System.out.println("In the test: " + result.get(0).t1Alias);
         Assert.assertFalse(result.get(0).t1Alias == "hobbies");
 
         // Also check for some of the other silly cases, like forcing a cross

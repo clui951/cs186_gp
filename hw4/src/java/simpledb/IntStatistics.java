@@ -1,5 +1,7 @@
 package simpledb;
 
+import simpledb.Predicate.Op;  
+
 /** A class to represent statistics for a single integer-based field.
  */
 public class IntStatistics {
@@ -9,6 +11,9 @@ public class IntStatistics {
     private int numTuples;
     private int numDistinctTuples;
     private final boolean[] distinctInts;
+    private int highVal;
+    private int lowVal;
+    private boolean valsSet;
 
     // TODO: IMPLEMENT ME
 
@@ -23,7 +28,7 @@ public class IntStatistics {
         numTuples = 0;
         numDistinctTuples = 0;
         distinctInts = new boolean[bins];
-
+        valsSet = false;
         // TODO: IMPLEMENT ME
     }
 
@@ -33,6 +38,19 @@ public class IntStatistics {
      */
     public void addValue(int v) {
         // TODO: IMPLEMENT ME
+        if (!valsSet) {
+            highVal = v;
+            lowVal = v;
+            valsSet = true;
+        }
+        else {
+            if (v > highVal) {
+                highVal = v;
+            }
+            if (v < lowVal) {
+                lowVal = v;
+            }
+        }
 
         // hashes the value and keeps an estimate to the number of distinct tuples we've seen
         int index = (hashCode(v) % distinctInts.length + distinctInts.length) % distinctInts.length;
@@ -59,7 +77,99 @@ public class IntStatistics {
         double numDistinct = ((double) numTuples) * numDistinctTuples / distinctInts.length;
 
         // TODO: IMPLEMENT ME
-        return -1.0;
+        if (op == Predicate.Op.NOT_EQUALS) {
+            if (v < lowVal || v > highVal) {
+                return 1.0;
+            }
+            else {
+                return 1.0 - 1.0/numDistinct;
+            }
+        }
+        else if (op == Predicate.Op.EQUALS) {
+            if (v < lowVal || v > highVal) {
+                return 0.0;
+            }
+            else {
+                return 1.0/numDistinct;
+            }
+        }
+        else if (op == Predicate.Op.GREATER_THAN) {
+            int numVals = highVal - lowVal;
+            int subsetCardinality = highVal - v;
+            if (numVals == 0 && v < highVal) { // Case v < all vals
+                return 1.0;
+            }
+            else if (numVals == 0 && v >= highVal) { // Case v >= all vals
+                return 0.0;
+            }
+            else if (v >= highVal) {
+                return 0.0;
+            }
+            else if (v < lowVal) {
+                return 1.0;
+            }
+            else {
+                return ((double) subsetCardinality)/numVals; 
+            }
+        }
+        else if (op == Predicate.Op.GREATER_THAN_OR_EQ) {
+            int numVals = highVal - lowVal;
+            int subsetCardinality = highVal - v;
+            if (numVals == 0 && v <= highVal) { // Case v < all vals
+                return 1.0;
+            }
+            else if (numVals == 0 && v > highVal) { // Case v >= all vals
+                return 0.0;
+            }
+            else if (v > highVal) {
+                return 0.0;
+            }
+            else if (v <= lowVal) {
+                return 1.0;
+            }
+            else {
+                return ((double) subsetCardinality)/numVals; 
+            }
+        }
+        else if (op == Predicate.Op.LESS_THAN) {
+            int numVals = highVal - lowVal;
+            int subsetCardinality = v - lowVal;
+            if (numVals == 0 && v > lowVal) { // Case v < all vals
+                return 1.0;
+            }
+            else if (numVals == 0 && v <= highVal) { // Case c >= all vals
+                return 0.0;
+            }
+            else if (v > highVal) {
+                return 1.0;
+            }
+            else if (v <= lowVal) {
+                return 0.0;
+            }
+            else {
+                return ((double) subsetCardinality)/numVals; 
+            }
+        }
+        else if (op == Predicate.Op.LESS_THAN_OR_EQ) {
+            int numVals = highVal - lowVal;
+            int subsetCardinality = v - lowVal;
+            if (numVals == 0 && v >= lowVal) { // Case v < all vals
+                return 1.0;
+            }
+            else if (numVals == 0 && v < highVal) { // Case c >= all vals
+                return 0.0;
+            }
+            else if (v >= highVal) {
+                return 1.0;
+            }
+            else if (v < lowVal) {
+                return 0.0;
+            }
+            else {
+                return ((double) subsetCardinality)/numVals; 
+            }
+        }
+        return -1.0; // Who knows what happens at this point
     }
 
     /**

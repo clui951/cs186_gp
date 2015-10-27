@@ -5,6 +5,9 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import java.util.*;
 
+import java.util.Iterator;
+
+
 /**
  * The JoinOptimizer class is responsible for ordering a series of joins
  * optimally, and for selecting the best instantiation of a join for a given
@@ -109,8 +112,7 @@ public class JoinOptimizer {
         } else {
 
             // TODO: IMPLEMENT ME
-
-            return -1.0;
+            return cost1 + card1*cost2 + card1*card2;
         }
     }
 
@@ -158,7 +160,25 @@ public class JoinOptimizer {
 
         // TODO: IMPLEMENT ME
 
-        return card <= 0 ? 1 : card;
+        if (joinOp == Predicate.Op.EQUALS) {
+            if (!(t1pkey || t2pkey)) {  // Equality join with no primary key
+                return Math.max(card1, card2);
+            }
+            else {
+                if (t1pkey && t2pkey) {
+                    return Math.min(card1, card2);
+                } 
+                else if (t1pkey) {
+                    return card2;
+                }
+                else {
+                    return card1;
+                }
+            }
+        }
+        // Some sort of range scan
+
+        return ((int) 0.3*card1*card2);
     }
 
     /**
@@ -215,8 +235,53 @@ public class JoinOptimizer {
         Vector<Double> planCosts = new Vector<>();
 
         // TODO: IMPLEMENT ME
+        // joins: vector<LogicalJoinNode>
+        Vector<LogicalJoinNode> joinsLeft = (Vector<LogicalJoinNode>) joins.clone();
+        int q = 1;
+        while (joinsLeft.size() > 0) {
+            // System.out.println("starting with loop: " + q);
+            LogicalJoinNode cheapestJoin = cheapestJoinNode(joinsLeft, plan, planCardinalities, planCosts, stats, filterSelectivities);
+            // System.out.println("CHEAPESTJOIN I GOT WAS: " + cheapestJoin );
+            joinsLeft.remove(cheapestJoin);
+            CostCard cheapestCostCard = costGreedyJoin(cheapestJoin, plan, planCardinalities, planCosts, stats, filterSelectivities);
+            plan.add(cheapestJoin);
+            planCardinalities.add(cheapestCostCard.card);
+            planCosts.add(cheapestCostCard.cost);
+            // System.out.println("finished with loop\n\n");
+            q++;
+        }
 
         return plan;
+    }
+
+
+    /** computes which logicaljoinnode has the minimal cost of join */
+    public LogicalJoinNode cheapestJoinNode( Vector<LogicalJoinNode> joinsLeft,
+                                    Vector<LogicalJoinNode> plan,
+                                    Vector<Integer> planCardinalities,
+                                    Vector<Double> planCosts,
+                                    HashMap<String, TableStats> stats,
+                                    HashMap<String, Double> filterSelectivities) {
+        LogicalJoinNode curr_cheapest = null;
+        Double val_cheapest = Double.MAX_VALUE;
+        Iterator it = joinsLeft.iterator();
+        LogicalJoinNode curr = null; //(LogicalJoinNode) it.next();
+        while (it.hasNext()) {
+            curr = (LogicalJoinNode) it.next();
+            // System.out.println("looking for cheapest loop");
+            try {
+                CostCard costcardd = costGreedyJoin(curr, plan, planCardinalities, planCosts, stats, filterSelectivities);
+                // System.out.println("costcard trying: " + costcardd.cost);
+
+                if (costcardd.cost < val_cheapest) {
+                    // System.out.println("costcard " + costcardd.cost + " is cheaper than " + val_cheapest);
+                    val_cheapest = costcardd.cost;
+                    curr_cheapest = curr;
+                }
+            } catch (Exception e) {System.out.println("ERROR SHOULDNOT THOUGH");}
+        }
+        // System.out.println("CHEAPESTJOINNODE IS RETURNING " + curr_cheapest);
+        return curr_cheapest;
     }
 
 
@@ -235,8 +300,33 @@ public class JoinOptimizer {
             throws ParsingException {
 
         // TODO: some code goes here
+//          PlanCache optjoin = new PlanCache();
 
-        return null; //replace me
+//         for (int i = 1; i <= joins.size(); i++) {
+//             Set<Set<LogicalJoinNode>> subsets = enumerateSubsets(joins, i);
+//             for (Set<LogicalJoinNode> s : subsets) {
+//                 Vector<LogicalJoinNode> bestPlan;
+//                 Double bestCostSoFar = Double.MAX_VALUE;
+//                 int cardinality = 0;
+//                 Set<Set<LogicalJoinNode>> subsubsets = enumerateSubsets(joins, i-1);
+//                 for (Set<LogicalJoinNode> ss : subsubsets) {
+//                     HashSet<LogicalJoinNode> sCopy = new HashSet<LogicalJoinNode>();
+//                     sCopy.addAll(s);
+//                     LogicalJoinNode joinToRemove = sCopy.removeAll(ss);
+//                     CostCard sCostCard = computeCostAndCardOfSubplan(stats, filterSelectivities, joinToRemove, s, bestCostSoFar, optjoin);
+//                     if (sCostCard != null) {
+//                         if (sCostCard.cost < bestCostSoFar) {
+//                             bestPlan = sCostCard.plan;
+//                             bestCostSoFar = sCostCard.cost;
+//                             cardinality = sCostCard.card;
+//                         }
+//                     }
+//                 }
+//                 optjoin.addPlan(s, bestCostSoFar, cardinality, bestPlan);
+//             }
+//         }
+//         return optjoin.getOrder(enumerateSubsets(joins, joins.size()).iterator().next());
+        return joins;
     }
 
     // ===================== Private Methods =================================
@@ -324,6 +414,7 @@ public class JoinOptimizer {
         int t1card, t2card;
         boolean leftPkey, rightPkey;
 
+        // System.out.println("PLANCOSTS: " + planCosts.size());
         // estimate cost of right subtree
         if (doesJoin(plan, table1Alias)) { // j.t1 is in plan already
             CostCard c = getCostCard(plan, planCardinalities, planCosts, table1Alias);
@@ -351,6 +442,7 @@ public class JoinOptimizer {
             leftPkey = isPkey(j.t1Alias, j.f1PureName);
 
         } else { // Neither is a plan, both are just single tables
+            // System.out.println("ELSE STATEMENT");
             t1cost = stats.get(table1Name).estimateScanCost();
             t1card = stats.get(table1Name).estimateTableCardinality(
                     filterSelectivities.get(j.t1Alias));
@@ -382,6 +474,7 @@ public class JoinOptimizer {
         cc.card = estimateJoinCardinality(j, t1card, t2card, leftPkey,
                 rightPkey, stats);
         cc.cost = cost1;
+        // System.out.println("costGreedyJoin is returning cc with cost: " + cost1);
         return cc;
     }
 
@@ -393,13 +486,16 @@ public class JoinOptimizer {
                                  Vector<Integer> planCardinalities,
                                  Vector<Double> planCosts,
                                  String table) {
-
+        // System.out.println("plancostssize " + planCosts.size());
         for (int i = plan.size() - 1; i >= 0; i--) {
             LogicalJoinNode j = plan.get(i);
             if (j.t1Alias.equals(table) || (j.t2Alias != null && j.t2Alias.equals(table))) {
                 CostCard c = new CostCard();
                 c.card = planCardinalities.get(i);
                 c.cost = planCosts.get(i);
+                // System.out.println("getCostCard plan.size: " + plan.size());
+                // System.out.println("getCostCard returning index: " + i);
+                // System.out.println("getCostCard returns: " + c.cost);
                 return c;
             }
         }
