@@ -82,7 +82,8 @@ public class IntStatistics {
                 return 1.0;
             }
             else {
-                return 1.0 - 1.0/numDistinct;
+                // return 1.0 - 1.0/numDistinct;
+                return 1 - estimateSelectivity(Predicate.Op.EQUALS, v);
             }
         }
         else if (op == Predicate.Op.EQUALS) {
@@ -113,23 +114,24 @@ public class IntStatistics {
             }
         }
         else if (op == Predicate.Op.GREATER_THAN_OR_EQ) {
-            int numVals = highVal - lowVal;
-            int subsetCardinality = highVal - v;
-            if (numVals == 0 && v <= highVal) { // Case v < all vals
-                return 1.0;
-            }
-            else if (numVals == 0 && v > highVal) { // Case v >= all vals
-                return 0.0;
-            }
-            else if (v > highVal) {
-                return 0.0;
-            }
-            else if (v <= lowVal) {
-                return 1.0;
-            }
-            else {
-                return ((double) subsetCardinality)/numVals; 
-            }
+            return estimateSelectivity(Predicate.Op.EQUALS, v) + estimateSelectivity(Predicate.Op.GREATER_THAN, v);
+            // int numVals = highVal - lowVal;
+            // int subsetCardinality = highVal - v;
+            // if (numVals == 0 && v <= highVal) { // Case v < all vals
+            //     return 1.0;
+            // }
+            // else if (numVals == 0 && v > highVal) { // Case v >= all vals
+            //     return 0.0;
+            // }
+            // else if (v > highVal) {
+            //     return 0.0;
+            // }
+            // else if (v <= lowVal) {
+            //     return 1.0;
+            // }
+            // else {
+            //     return ((double) subsetCardinality)/numVals; 
+            // }
         }
         else if (op == Predicate.Op.LESS_THAN) {
             int numVals = highVal - lowVal;
@@ -151,23 +153,24 @@ public class IntStatistics {
             }
         }
         else if (op == Predicate.Op.LESS_THAN_OR_EQ) {
-            int numVals = highVal - lowVal;
-            int subsetCardinality = v - lowVal;
-            if (numVals == 0 && v >= lowVal) { // Case v < all vals
-                return 1.0;
-            }
-            else if (numVals == 0 && v < highVal) { // Case c >= all vals
-                return 0.0;
-            }
-            else if (v >= highVal) {
-                return 1.0;
-            }
-            else if (v < lowVal) {
-                return 0.0;
-            }
-            else {
-                return ((double) subsetCardinality)/numVals; 
-            }
+            return estimateSelectivity(Predicate.Op.EQUALS, v) + estimateSelectivity(Predicate.Op.LESS_THAN, v);
+            // int numVals = highVal - lowVal;
+            // int subsetCardinality = v - lowVal;
+            // if (numVals == 0 && v >= lowVal) { // Case v < all vals
+            //     return 1.0;
+            // }
+            // else if (numVals == 0 && v < highVal) { // Case c >= all vals
+            //     return 0.0;
+            // }
+            // else if (v >= highVal) {
+            //     return 1.0;
+            // }
+            // else if (v < lowVal) {
+            //     return 0.0;
+            // }
+            // else {
+            //     return ((double) subsetCardinality)/numVals; 
+            // }
         }
         return -1.0; // Who knows what happens at this point
     }
