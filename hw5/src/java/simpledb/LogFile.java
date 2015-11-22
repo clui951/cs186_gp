@@ -441,7 +441,6 @@ public class LogFile {
                 // some code goes here
                 long currentOffset = raf.getFilePointer();
                 long logRecord = tidToFirstLogRecord.get(tid.getId());
-                boolean transactionOver = false;
                 long thisId = tid.getId();
                 Stack<Page> beforeStack = new Stack<Page>();
                 Stack<Page> afterStack = new Stack<Page>();
@@ -450,11 +449,23 @@ public class LogFile {
                     while (raf.getFilePointer() < currentOffset) { // while there are still statements left in the transaction
                         int cpType = raf.readInt();
                         long cpTid = raf.readLong();
-                        if (cpType == UPDATE_RECORD && cpTid == thisId) {
-                            Page before = readPageData(raf);
-                            beforeStack.push(before);
-                            Page after = readPageData(raf); // raf is at next record after this
-                            afterStack.push(after);
+                        if (cpType == UPDATE_RECORD) {
+                            if (cpTid == thisId) {
+                                Page before = readPageData(raf);
+                                beforeStack.push(before);
+                                Page after = readPageData(raf); // raf is at next record after this
+                                afterStack.push(after);
+                            } else {
+                                Page before = readPageData(raf);
+                                Page after = readPageData(raf); // raf is at next record after this
+                            }
+                        } else if (cpType == CHECKPOINT_RECORD) {
+                            int numTransactions = raf.readInt();
+                            while (numTransactions-- > 0) {
+                                long temptid = raf.readLong();
+                                long firstRecord = raf.readLong();
+                            }
+                            long tempppp = raf.readLong();
                         }
                         else {
                             // find next record of our transaction
@@ -465,12 +476,66 @@ public class LogFile {
                 while (!beforeStack.isEmpty()) {
                     Page beforeItem = beforeStack.pop();
                     Page afterItem = afterStack.pop();
+                    Database.getBufferPool().discardPage(afterItem.getId());
                     Database.getCatalog().getDbFile(afterItem.getId().getTableId()).writePage(beforeItem);
                 }
                 raf.seek(currentOffset);
             }
         }
     }
+
+    // public void rollbacklong(long tid)
+    //     throws NoSuchElementException, IOException {
+    //     synchronized (Database.getBufferPool()) {
+    //         synchronized(this) {
+    //             preAppend();
+    //             // some code goes here
+    //             long currentOffset = raf.getFilePointer();
+    //             long logRecord = tidToFirstLogRecord.get(tid);
+    //             long thisId = tid;
+    //             Stack<Page> beforeStack = new Stack<Page>();
+    //             Stack<Page> afterStack = new Stack<Page>();
+    //             raf.seek(logRecord);
+    //             try {
+    //                 while (raf.getFilePointer() < currentOffset) { // while there are still statements left in the transaction
+    //                     int cpType = raf.readInt();
+    //                     long cpTid = raf.readLong();
+    //                     if (cpType == UPDATE_RECORD) {
+    //                         if (cpTid == thisId) {
+    //                             Page before = readPageData(raf);
+    //                             beforeStack.push(before);
+    //                             Page after = readPageData(raf); // raf is at next record after this
+    //                             afterStack.push(after);
+    //                         } else {
+    //                             Page before = readPageData(raf);
+    //                             Page after = readPageData(raf); // raf is at next record after this
+    //                         }
+    //                     } else if (cpType == CHECKPOINT_RECORD) {
+    //                         int numTransactions = raf.readInt();
+    //                         while (numTransactions-- > 0) {
+    //                             long temptid = raf.readLong();
+    //                             long firstRecord = raf.readLong();
+    //                         }
+    //                         long tempppp = raf.readLong();
+    //                     }
+    //                     else {
+    //                         // find next record of our transaction
+    //                         raf.readLong();
+    //                     }
+    //                 }
+    //             } catch (Exception e) {}
+    //             while (!beforeStack.isEmpty()) {
+    //                 Page beforeItem = beforeStack.pop();
+    //                 Page afterItem = afterStack.pop();
+    //                 Database.getCatalog().getDbFile(afterItem.getId().getTableId()).writePage(beforeItem);
+    //             }
+    //             raf.seek(currentOffset);
+    //         }
+    //     }
+    // }
+
+
+    
 
     /** Shutdown the logging system, writing out whatever state
         is necessary so that start up can happen quickly (without
@@ -498,6 +563,54 @@ public class LogFile {
             }
          }
     }
+    // public void recover() throws IOException {
+    //     synchronized (Database.getBufferPool()) {
+    //         synchronized (this) {
+    //             recoveryUndecided = false;
+    //             // some code goes here
+    //             long currentOffset = raf.getFilePointer();
+
+    //             // See if there is a last-written checkpoint
+    //             raf.seek(0);
+    //             long start = raf.readLong();
+                
+
+    //             if (start == -1) { // No last checkpoint
+    //                 start = 0; // Set to beginning
+    //             }
+    //             raf.seek(start);
+    //             HashSet<Long> loserIds = new HashSet<Long>(); // set of loser transactions
+    //             try {
+    //                 while (raf.getFilePointer() < currentOffset) {
+    //                     // Build set of loser transactions
+    //                     // Redo updates of winner transactions
+    //                     int cpType = raf.readInt();
+    //                     long cpTid = raf.readLong();
+    //                     if (cpType == UPDATE_RECORD) {
+    //                         loserIds.add(cpTid);
+    //                         Page before = readPageData(raf);
+    //                         Page after = readPageData(raf);
+    //                         Database.getCatalog().getDbFile(after.getId().getTableId()).writePage(after);
+    //                     } else if (cpType == COMMIT_RECORD) {
+    //                         loserIds.remove(cpTid);
+    //                         raf.readLong();
+    //                     } 
+    //                     else {
+    //                         raf.readLong();
+    //                     }
+    //                 }
+    //             } catch (Exception e) {}
+    //             for (long tempId: loserIds) {
+    //                 // need to convert tempId from long to TransactionID
+    //                 rollbacklong(tempId);
+    //             }
+
+    //             // Loop through and undo updates of loser transactions
+
+    //             raf.seek(currentOffset);
+    //         }
+    //      }
+    // }
 
     /** Print out a human readable represenation of the log */
     public void print() throws IOException {
