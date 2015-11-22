@@ -439,7 +439,6 @@ public class LogFile {
             synchronized(this) {
                 preAppend();
                 // some code goes here
-                // System.out.println("\n\nNEW ROLLBACK() CALLED");
                 long currentOffset = raf.getFilePointer();
                 long logRecord = tidToFirstLogRecord.get(tid.getId());
                 boolean transactionOver = false;
@@ -447,22 +446,15 @@ public class LogFile {
                 Stack<Page> beforeStack = new Stack<Page>();
                 Stack<Page> afterStack = new Stack<Page>();
                 raf.seek(logRecord);
-                // System.out.printf("ROUND1 filepointer: %d  ; currOffset: %d\n", raf.getFilePointer(), currentOffset);
-                int count1 = 0;
                 try {
                     while (raf.getFilePointer() < currentOffset) { // while there are still statements left in the transaction
                         int cpType = raf.readInt();
                         long cpTid = raf.readLong();
                         if (cpType == UPDATE_RECORD && cpTid == thisId) {
-                            count1++;
-                            // System.out.printf("found update record: %d \n", count1);
                             Page before = readPageData(raf);
                             beforeStack.push(before);
                             Page after = readPageData(raf); // raf is at next record after this
                             afterStack.push(after);
-                            
-                            // System.out.println(count1);
-
                         }
                         else {
                             // find next record of our transaction
@@ -470,19 +462,12 @@ public class LogFile {
                         }
                     }
                 } catch (Exception e) {}
-                // System.out.printf("ROUND2 filepointer: %d  ; currOffset: %d\n", raf.getFilePointer(), currentOffset);
-                int count = 0;
                 while (!beforeStack.isEmpty()) {
-                    // remove from stack
                     Page beforeItem = beforeStack.pop();
                     Page afterItem = afterStack.pop();
-                    // buffPool.replacePage(afterItemId ,beforeItem);
-                    count++;
-                    // System.out.printf("inserting to database: %d\n" , count);
                     Database.getCatalog().getDbFile(afterItem.getId().getTableId()).writePage(beforeItem);
                 }
                 raf.seek(currentOffset);
-                // buffPool.flushPages(tid);
             }
         }
     }
