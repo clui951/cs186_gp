@@ -445,34 +445,35 @@ public class LogFile {
                 Stack<Page> beforeStack = new Stack<Page>();
                 Stack<Page> afterStack = new Stack<Page>();
                 raf.seek(logRecord);
-                try {
-                    while (raf.getFilePointer() < currentOffset) { // while there are still statements left in the transaction
-                        int cpType = raf.readInt();
-                        long cpTid = raf.readLong();
-                        if (cpType == UPDATE_RECORD) {
-                            if (cpTid == thisId) {
-                                Page before = readPageData(raf);
-                                beforeStack.push(before);
-                                Page after = readPageData(raf); // raf is at next record after this
-                                afterStack.push(after);
-                            } else {
-                                Page before = readPageData(raf);
-                                Page after = readPageData(raf); // raf is at next record after this
-                            }
-                        } else if (cpType == CHECKPOINT_RECORD) {
-                            int numTransactions = raf.readInt();
-                            while (numTransactions-- > 0) {
-                                long temptid = raf.readLong();
-                                long firstRecord = raf.readLong();
-                            }
-                            long tempppp = raf.readLong();
+                // try {
+                while (raf.getFilePointer() < currentOffset) { // while there are still statements left in the transaction
+                    int cpType = raf.readInt();
+                    long cpTid = raf.readLong();
+                    if (cpType == UPDATE_RECORD) {
+                        if (cpTid == thisId) {
+                            Page before = readPageData(raf);
+                            beforeStack.push(before);
+                            Page after = readPageData(raf); // raf is at next record after this
+                            afterStack.push(after);
+                        } else {
+                            Page before = readPageData(raf);
+                            Page after = readPageData(raf); // raf is at next record after this
                         }
-                        else {
-                            // find next record of our transaction
-                            raf.readLong();
+                        raf.readLong(); // read past the offset as well!
+                    } else if (cpType == CHECKPOINT_RECORD) {
+                        int numTransactions = raf.readInt();
+                        while (numTransactions-- > 0) {
+                            long temptid = raf.readLong();
+                            long firstRecord = raf.readLong();
                         }
+                        long tempppp = raf.readLong();
                     }
-                } catch (Exception e) {}
+                    else {
+                        // find next record of our transaction
+                        raf.readLong();
+                    }
+                }
+                // } catch (Exception e) {}
                 while (!beforeStack.isEmpty()) {
                     Page beforeItem = beforeStack.pop();
                     Page afterItem = afterStack.pop();
