@@ -486,7 +486,7 @@ public class LogFile {
     }
 
 
-    public void rollbackhashset(HashSet<Long> loserIds, HashMap<Long,Long> pageIdToCommitOffset, long start, long end)
+    public void rollbackhashset(HashSet<Long> loserIds, long start, long end)
         throws NoSuchElementException, IOException {
         synchronized (Database.getBufferPool()) {
             synchronized(this) {
@@ -503,10 +503,10 @@ public class LogFile {
                 long nextOffset = currentOffset - LONG_SIZE; // Initialize offset of previous transaction so we know where to go after
                 raf.seek(currentOffset);  // Let's start with this transaction
 
-                System.out.printf("LOSERS:\n");
-                for (Long lose : loserIds) {
-                    System.out.println(lose);
-                }
+                // System.out.printf("LOSERS:\n");
+                // for (Long lose : loserIds) {
+                    // System.out.println(lose);
+                // }
                 
                 // try {
                 while (currentOffset > LONG_SIZE) { // when currentOffset = LONG_SIZE then we are at beginning and we are done
@@ -516,14 +516,10 @@ public class LogFile {
                     if (cpType == UPDATE_RECORD) {
                         // System.out.printf("found update record of cpTid: %d \n", cpTid);
                         if ( loserIds.contains(cpTid) ) {
-                            Long possibleCommitTime = pageIdToCommitOffset.get(cpTid);
                             Page before = readPageData(raf);
                             Page after = readPageData(raf); // raf is at next record after this
-                            if ((possibleCommitTime == null) || (recordTime > possibleCommitTime)) {
-                                System.out.printf("MATCHED: %d is in loserIds and uncommitted page\n", cpTid);
-                                beforeStack.push(before);
-                                afterStack.push(after);
-                            }
+                            beforeStack.push(before);
+                            afterStack.push(after);
                         } else {
                             Page before = readPageData(raf);
                             Page after = readPageData(raf); // raf is at next record after this
@@ -591,7 +587,7 @@ public class LogFile {
     public void recover() throws IOException {
         synchronized (Database.getBufferPool()) {
             synchronized (this) {
-                print();
+                // print();
                 recoveryUndecided = false;
                 // some code goes here
 
@@ -603,10 +599,10 @@ public class LogFile {
                 long start = raf.readLong(); // read checkpoint log #
                 
                 HashSet<Long> loserIds = new HashSet<Long>(); // set of loser transactions
-                HashMap<Long, Long> pageIdToCommitOffset = new HashMap<Long,Long>(); // hash page id to latest commit time
+                HashSet<Long> winnerIds = new HashSet<Long>(); // set of loser transactions
 
                 if (start != -1) {
-                    System.out.println("checkpoint found");
+                    // System.out.println("checkpoint found");
                     raf.seek(start);
                     raf.readInt(); // checkpoint type
                     raf.readLong(); // checkpoint tid
@@ -636,17 +632,43 @@ public class LogFile {
                         raf.readLong(); // read past the offset as well!
                     } else if (cpType == COMMIT_RECORD) {
                         loserIds.remove(cpTid);
+                        winnerIds.add(cpTid);
                         raf.readLong();
-                        Long oldCommitTime = pageIdToCommitOffset.get(cpTid);
-                        if ((oldCommitTime == null) || (recordTime > pageIdToCommitOffset.get(cpTid))) {
-                            pageIdToCommitOffset.put(cpTid, recordTime);
-                        }
                     }
                     else {
                         raf.readLong();
                     }
                 }
-                rollbackhashset(loserIds, pageIdToCommitOffset, 0, currentOffset);
+                rollbackhashset(loserIds, 0, currentOffset);
+
+                // 3rd pass
+                raf.seek(0);
+                raf.readLong();
+                while (raf.getFilePointer() < currentOffset) {
+                    long recordTime = raf.getFilePointer(); // possible commit time
+                    int cpType = raf.readInt();
+                    long cpTid = raf.readLong();
+                    if (cpType == UPDATE_RECORD && winnerIds.contains(cpTid)) {
+                        Page before = readPageData(raf);
+                        Page after = readPageData(raf);
+                        Database.getCatalog().getDbFile(after.getId().getTableId()).writePage(after);
+                        raf.readLong(); // read past the offset as well!
+                    } else if (cpType == CHECKPOINT_RECORD) {
+                        int numTransactions = raf.readInt();
+                        while (numTransactions-- > 0) {
+                            long tid = raf.readLong();
+                            long firstRecord = raf.readLong();
+                        }
+                        raf.readLong();
+                    }
+                    else {
+                        raf.readLong();
+                    }
+                }
+
+
+
+
 
                 raf.seek(raf.length() - 8); // 8 for size of long
                 currentOffset = raf.readLong(); // need to recalculate because log extended when recover
@@ -662,7 +684,7 @@ public class LogFile {
 
         raf.seek(0);
 
-        System.out.println("\n\n\n---BEGGINING A NEW TEST---\n0: checkpoint record at offset " + raf.readLong());
+        // System.out.println("\n\n\n---BEGGINING A NEW TEST---\n0: checkpoint record at offset " + raf.readLong());
 
         while (true) {
             try {
