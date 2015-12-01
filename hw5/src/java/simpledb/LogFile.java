@@ -602,7 +602,7 @@ public class LogFile {
                 HashSet<Long> winnerIds = new HashSet<Long>(); // set of loser transactions
 
                 if (start != -1) {
-                    // System.out.println("checkpoint found");
+                    System.out.println("checkpoint found");
                     raf.seek(start);
                     raf.readInt(); // checkpoint type
                     raf.readLong(); // checkpoint tid
@@ -616,27 +616,32 @@ public class LogFile {
                 }
 
 
-                while (raf.getFilePointer() < currentOffset) {
-                    long recordTime = raf.getFilePointer(); // possible commit time
-                    int cpType = raf.readInt();
-                    long cpTid = raf.readLong();
-                    // System.out.printf("new record of type: %d\n" ,cpType);
-                    if (cpType == BEGIN_RECORD) {
-                        loserIds.add(cpTid);
-                        raf.readLong();
+                while (true) {
+                    try {
+                        long recordTime = raf.getFilePointer(); // possible commit time
+                        int cpType = raf.readInt();
+                        long cpTid = raf.readLong();
+                        // System.out.printf("new record of type: %d\n" ,cpType);
+                        if (cpType == BEGIN_RECORD) {
+                            loserIds.add(cpTid);
+                            raf.readLong();
+                        }
+                        if (cpType == UPDATE_RECORD) {
+                            Page before = readPageData(raf);
+                            Page after = readPageData(raf);
+                            Database.getCatalog().getDbFile(after.getId().getTableId()).writePage(after);
+                            raf.readLong(); // read past the offset as well!
+                        } else if (cpType == COMMIT_RECORD) {
+                            loserIds.remove(cpTid);
+                            winnerIds.add(cpTid);
+                            raf.readLong();
+                        }
+                        else {
+                            raf.readLong();
+                        }
                     }
-                    if (cpType == UPDATE_RECORD) {
-                        Page before = readPageData(raf);
-                        Page after = readPageData(raf);
-                        Database.getCatalog().getDbFile(after.getId().getTableId()).writePage(after);
-                        raf.readLong(); // read past the offset as well!
-                    } else if (cpType == COMMIT_RECORD) {
-                        loserIds.remove(cpTid);
-                        winnerIds.add(cpTid);
-                        raf.readLong();
-                    }
-                    else {
-                        raf.readLong();
+                    catch (Exception e) {
+                        break;
                     }
                 }
                 rollbackhashset(loserIds, 0, currentOffset);
@@ -644,25 +649,36 @@ public class LogFile {
                 // 3rd pass
                 raf.seek(0);
                 raf.readLong();
-                while (raf.getFilePointer() < currentOffset) {
-                    long recordTime = raf.getFilePointer(); // possible commit time
-                    int cpType = raf.readInt();
-                    long cpTid = raf.readLong();
-                    if (cpType == UPDATE_RECORD && winnerIds.contains(cpTid)) {
-                        Page before = readPageData(raf);
-                        Page after = readPageData(raf);
-                        Database.getCatalog().getDbFile(after.getId().getTableId()).writePage(after);
-                        raf.readLong(); // read past the offset as well!
-                    } else if (cpType == CHECKPOINT_RECORD) {
-                        int numTransactions = raf.readInt();
-                        while (numTransactions-- > 0) {
-                            long tid = raf.readLong();
-                            long firstRecord = raf.readLong();
+                while (true) {
+                    try {
+                        long recordTime = raf.getFilePointer(); // possible commit time
+                        int cpType = raf.readInt();
+                        long cpTid = raf.readLong();
+                        if (cpType == UPDATE_RECORD && winnerIds.contains(cpTid)) {
+                            Page before = readPageData(raf);
+                            Page after = readPageData(raf);
+                            Database.getCatalog().getDbFile(after.getId().getTableId()).writePage(after);
+                            raf.readLong(); // read past the offset as well!
                         }
-                        raf.readLong();
+                        else if (cpType == UPDATE_RECORD && !winnerIds.contains(cpTid)) {
+                            Page before = readPageData(raf);
+                            Page after = readPageData(raf);
+                            raf.readLong(); // read past the offset as well!   
+                        }
+                        else if (cpType == CHECKPOINT_RECORD) {
+                            int numTransactions = raf.readInt();
+                            while (numTransactions-- > 0) {
+                                long tid = raf.readLong();
+                                long firstRecord = raf.readLong();
+                            }
+                            raf.readLong();
+                        }
+                        else {
+                            raf.readLong();
+                        }
                     }
-                    else {
-                        raf.readLong();
+                    catch (Exception e) {
+                        break;
                     }
                 }
 
