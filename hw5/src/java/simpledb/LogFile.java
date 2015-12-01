@@ -96,7 +96,7 @@ public class LogFile {
         @param f The log file's name
     */
     public LogFile(File f) throws IOException {
-	this.logFile = f;
+    this.logFile = f;
         raf = new RandomAccessFile(f, "rw");
         recoveryUndecided = true;
     }
@@ -503,10 +503,10 @@ public class LogFile {
                 long nextOffset = currentOffset - LONG_SIZE; // Initialize offset of previous transaction so we know where to go after
                 raf.seek(currentOffset);  // Let's start with this transaction
 
-                // System.out.printf("LOSERS:\n");
-                // for (Long lose : loserIds) {
-                    // System.out.println(lose);
-                // }
+                System.out.printf("LOSERS:\n");
+                for (Long lose : loserIds) {
+                    System.out.println(lose);
+                }
                 
                 // try {
                 while (currentOffset > LONG_SIZE) { // when currentOffset = LONG_SIZE then we are at beginning and we are done
@@ -516,10 +516,14 @@ public class LogFile {
                     if (cpType == UPDATE_RECORD) {
                         // System.out.printf("found update record of cpTid: %d \n", cpTid);
                         if ( loserIds.contains(cpTid) ) {
+                            // Long possibleCommitTime = pageIdToCommitOffset.get(cpTid);
                             Page before = readPageData(raf);
                             Page after = readPageData(raf); // raf is at next record after this
-                            beforeStack.push(before);
-                            afterStack.push(after);
+                            // if ((possibleCommitTime == null) || (recordTime > possibleCommitTime)) {
+                                System.out.printf("MATCHED: %d is in loserIds and uncommitted page\n", cpTid);
+                                beforeStack.push(before);
+                                afterStack.push(after);
+                            // }
                         } else {
                             Page before = readPageData(raf);
                             Page after = readPageData(raf); // raf is at next record after this
@@ -700,7 +704,7 @@ public class LogFile {
 
         raf.seek(0);
 
-        // System.out.println("\n\n\n---BEGGINING A NEW TEST---\n0: checkpoint record at offset " + raf.readLong());
+        System.out.println("\n\n\n---BEGINNING A NEW TEST---\n0: checkpoint record at offset " + raf.readLong());
 
         while (true) {
             try {
